@@ -4,8 +4,8 @@
 Azure AD Entra ID the core identity management service for this project. Proper configuration ensures secure user management and governance.
 
 ### Steps:
-1. **Create or Access Azure AD Instance**:
-   - Navigate to **Azure Active Directory** in the Azure portal.
+1. **Create or Access Azure Entra ID Instance**:
+   - Navigate to **Azure Entra ID Directory** in the Azure portal.
    - If necessary, create a new instance by selecting **Create an ID**.
    
 2. **Add New User**:
