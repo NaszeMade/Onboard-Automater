@@ -1,0 +1,143 @@
+{
+  "definition": {
+    "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowDefinition.json#",
+    "actions": {
+      "Create_User": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {
+              "name": "@parameters('$connections')['azuread']['connectionId']"
+            }
+          },
+          "method": "post",
+          "path": "/users",
+          "body": {
+            "accountEnabled": true,
+            "displayName": "@triggerBody()['DisplayName']",
+            "mailNickname": "@triggerBody()['MailNickname']",
+            "userPrincipalName": "@concat(triggerBody()['MailNickname'], '@yourdomain.com')",
+            "passwordProfile": {
+              "forceChangePasswordNextSignIn": true,
+              "password": "TempPassword123!"
+            }
+          }
+        }
+      },
+      "Assign_Role": {
+        "type": "If",
+        "expression": {
+          "equals": [
+            "@triggerBody()['Department']",
+            "IT"
+          ]
+        },
+        "actions": {
+          "Assign_IT_Role": {
+            "type": "ApiConnection",
+            "inputs": {
+              "host": {
+                "connection": {
+                  "name": "@parameters('$connections')['azuread']['connectionId']"
+                }
+              },
+              "method": "post",
+              "path": "/users/@{Create_User.body.userPrincipalName}/assignments",
+              "body": {
+                "roleDefinitionId": "/roleDefinitions/<role-id>",
+                "scope": "/subscriptions/<subscription-id>/resourceGroups/<resource-group>"
+              }
+            }
+          }
+        }
+      },
+      "Provision_Resources": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {
+              "name": "@parameters('$connections')['azure-arm']['connectionId']"
+            }
+          },
+          "method": "post",
+          "path": "/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Compute/virtualMachines",
+          "body": {
+            "name": "@concat(triggerBody()['MailNickname'], '-VM')",
+            "location": "East US",
+            "properties": {
+              "hardwareProfile": {
+                "vmSize": "Standard_DS1_v2"
+              },
+              "storageProfile": {
+                "osDisk": {
+                  "name": "osDisk",
+                  "createOption": "FromImage",
+                  "managedDisk": {
+                    "storageAccountType": "Standard_LRS"
+                  }
+                }
+              },
+              "osProfile": {
+                "computerName": "@triggerBody()['DisplayName']",
+                "adminUsername": "adminUser",
+                "adminPassword": "YourPassword123!"
+              },
+              "networkProfile": {
+                "networkInterfaces": [
+                  {
+                    "id": "/subscriptions/<subscription-id>/resourceGroups/<resource-group>/providers/Microsoft.Network/networkInterfaces/nic1"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      },
+      "Send_Welcome_Email": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {
+              "name": "@parameters('$connections')['office365']['connectionId']"
+            }
+          },
+          "method": "post",
+          "path": "/v2/Mail",
+          "body": {
+            "message": {
+              "subject": "Welcome to the company, @triggerBody()['DisplayName']",
+              "body": {
+                "contentType": "HTML",
+                "content": "Hello @triggerBody()['DisplayName'], <br><br>Welcome to the company! Your username is @concat(triggerBody()['MailNickname'], '@yourdomain.com').<br><br>Best Regards,<br>IT Team"
+              },
+              "toRecipients": [
+                {
+                  "emailAddress": {
+                    "address": "@triggerBody()['Email']"
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "triggers": {
+      "When_a_new_item_is_created": {
+        "type": "ApiConnection",
+        "inputs": {
+          "host": {
+            "connection": {
+              "name": "@parameters('$connections')['outlook']['connectionId']"
+            }
+          },
+          "method": "get",
+          "path": "/v2/items",
+          "queries": {
+            "filter": "IsNew eq true"
+          }
+        }
+      }
+    }
+  }
+}
